@@ -1,0 +1,193 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hong Kong Trip - Panel UI (No Images, Fixed)</title>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<style>
+body, html {margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background:#f5f7fb;}
+.container {display: flex; flex-direction: row; height: 100%;}
+#map {flex: 2; height: 100%;}
+.sidebar {flex: 1; overflow-y: auto; background: #ffffff; padding: 12px; border-left: 1px solid #e6e8eb;}
+.header {position: sticky; top: 0; background: #fff; padding: 10px 12px; font-weight: 700; border-bottom: 1px solid #e6e8eb; z-index: 10;}
+.card {background: #fff; border: 1px solid #e6e8eb; border-radius: 12px; padding: 12px; margin: 12px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer;}
+.card h3 {margin: 0 0 6px 0; font-size: 1rem;}
+.card p {margin: 0; color: #555; font-size: 0.95rem; line-height: 1.5;}
+.card:hover {background:#f9fafc;}
+.badge {display:inline-block; min-width:24px; text-align:center; margin-right:6px; background:#eef4ff; color:#2357ff; border-radius:999px; padding:2px 8px; font-size:0.8rem;}
+@media (max-width: 900px) {
+  .container {flex-direction: column;}
+  #map {height: 52vh;}
+  .sidebar {height: 48vh;}
+}
+
+.itinerary-card {background:#fff; border:1px solid #e6e8eb; border-radius:12px; padding:12px; margin:12px 0; box-shadow:0 2px 8px rgba(0,0,0,0.04);}
+.itinerary-card h3 {margin:0 0 8px 0; font-size:1rem;}
+.itinerary-card ul {margin:6px 0 0 18px; padding:0;}
+.itinerary-card li {margin:4px 0; color:#444; font-size:0.95rem;}
+.badge-time {display:inline-block; min-width:58px; text-align:center; margin-right:8px; background:#f3f5ff; color:#1e40ff; border-radius:6px; padding:2px 6px; font-size:0.8rem;}
+
+.tabs { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #e6e8eb; position: sticky; top: 44px; background:#fff; z-index: 9; }
+.tab-btn { padding: 8px 12px; border: 1px solid #e6e8eb; border-radius: 999px; background:#f6f8fc; font-size: 0.95rem; cursor: pointer; }
+.tab-btn.active { background:#e8efff; color:#1e40ff; border-color:#c7d7ff; }
+.tab-panels { padding: 8px 12px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.split { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 900px) {
+  .split { grid-template-columns: 1fr 1fr; }
+}
+.split-col { min-height: 120px; }
+
+.sticky-subhead { position: sticky; top: 86px; background:#fff; padding:6px 0; font-weight:700; z-index:8; }
+
+.card--tip { border-left: 4px solid #1e40ff; }
+
+.btn { display:inline-block; padding:8px 10px; border:1px solid #e6e8eb; border-radius:8px; background:#f8fafc; cursor:pointer; font-size:0.92rem; }
+.btn:hover { background:#eef4ff; }
+.btn-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.small { font-size: 0.9rem; color:#666; }
+
+html { scroll-behavior: smooth; }
+.sidebar { position: relative; overflow-y: auto; }
+.sidebar::-webkit-scrollbar { width: 10px; }
+.sidebar::-webkit-scrollbar-track { background: #f3f5fa; border-left: 1px solid #e6e8eb; }
+.sidebar::-webkit-scrollbar-thumb { background: #c9d3ea; border-radius: 8px; border: 2px solid #f3f5fa; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: #b2c1e6; }
+.sidebar { scrollbar-color: #c9d3ea #f3f5fa; scrollbar-width: thin; }
+
+/* Top & bottom gradient fades for scrolling hint */
+.sidebar::before, .sidebar::after {
+  content: ""; position: sticky; display: block; height: 16px; z-index: 11; pointer-events: none;
+}
+.sidebar::before { top: 44px; /* below header */ background: linear-gradient(to bottom, rgba(255,255,255,1), rgba(255,255,255,0)); }
+.sidebar::after { bottom: 0; background: linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0)); }
+
+/* Tabs aesthetics */
+.tabs { gap: 10px; padding: 10px 12px; background: #fff; box-shadow: 0 1px 0 #e6e8eb; }
+.tabs.scrolled { box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
+.tab-btn { position: relative; background: #f5f7fd; border-radius: 999px; border: 1px solid #dfe6fb; color: #314167; }
+.tab-btn:hover { background: #eef3ff; }
+.tab-btn.active { background: #e8efff; color: #1e40ff; border-color: #c7d7ff; }
+.tab-btn.active::after {
+  content: ""; position: absolute; left: 14px; right: 14px; bottom: -6px; height: 3px; background: #3b73ff; border-radius: 2px;
+}
+
+/* Panels padding and split columns */
+.tab-panels { padding: 10px 12px 16px; }
+.split { gap: 16px; }
+.split-col { background: transparent; }
+
+/* Cards polish */
+.card { transition: transform .15s ease, box-shadow .15s ease; }
+.card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+.card h3 { font-weight: 700; color: #1d2847; }
+.card p { color: #495377; }
+
+/* Sticky subheader spacer to avoid overlap */
+.header { position: sticky; top: 0; background: #fff; z-index: 12; box-shadow: 0 1px 0 #e6e8eb; }
+</style>
+</head>
+<body>
+<div class="container">
+<div id="map"></div>
+<div class="sidebar">
+<div class="header">Hong Kong 1‑Day Plan · Photo + Shopping</div><div class="tabs"><button class="tab-btn active" data-tab="plan">Plan</button><button class="tab-btn" data-tab="places">Places</button></div><div class="tab-panels"><div class="tab-panel active" id="tab-plan"><div class="split"><div class="split-col"><div class="itinerary-card"><h3>Itinerary Overview</h3><ul><li><span class="badge-time">Morning</span>Pacific Place → Hong Kong Park → Peak Tram → The Peak (Sky Terrace)</li><li><span class="badge-time">Midday</span>Queen’s Road Central → Pedder Street → Lunch (Kau Kee / Sing Heung Yuen)</li><li><span class="badge-time">Afternoon</span>Harbour City → K11 MUSEA (shopping + rest)</li><li><span class="badge-time">Evening</span>Avenue of Stars (sunset &amp; night skyline)</li></ul></div></div><div class="split-col"><div class="card card--tip"><h3>Tips</h3><ul><li>Transit: Use MTR + Star Ferry for speed and views.</li><li>Lighting: Morning at The Peak; indoor malls mid‑day; sunset at Avenue of Stars.</li><li>Footwear: Wear comfortable shoes; walking involved.</li><li>Payments: Octopus card works for MTR, buses, ferries.</li></ul></div></div></div></div><div class="tab-panel" id="tab-places"><div class="split"><div class="split-col"><div id="sidebar"></div></div><div class="split-col" id="place-detail"><div class="card"><h3>Select a place</h3><p>Tap on a place card to see details and map actions.</p></div></div></div></div></div>
+</div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const locations = [{"name": "Pacific Place", "lat": 22.2772, "lon": 114.1653, "desc": "High-end mall with elegant lines & natural light for modern shots."}, {"name": "Hong Kong Park", "lat": 22.2779, "lon": 114.1641, "desc": "Greenery, ponds, and a glasshouse for nature shots."}, {"name": "Peak Tram Station", "lat": 22.2771, "lon": 114.159, "desc": "Classic ride up to The Peak."}, {"name": "The Peak", "lat": 22.2758, "lon": 114.1455, "desc": "Panoramic view of Victoria Harbour; best in morning."}, {"name": "Queen's Road Central", "lat": 22.282, "lon": 114.1587, "desc": "Street photography with a mix of modern and colonial architecture."}, {"name": "Pedder Street", "lat": 22.2826, "lon": 114.1581, "desc": "Luxury storefronts; great symmetrical backdrops."}, {"name": "Kau Kee Noodle", "lat": 22.2853, "lon": 114.1507, "desc": "Famous Hong Kong beef brisket noodles."}, {"name": "Sing Heung Yuen", "lat": 22.2851, "lon": 114.1505, "desc": "Tomato beef macaroni \u2014 a local classic."}, {"name": "Harbour City", "lat": 22.2951, "lon": 114.1687, "desc": "Hong Kong's largest mall with seafront terrace photo spot."}, {"name": "K11 Musea", "lat": 22.294, "lon": 114.1735, "desc": "Art-meets-retail architecture; many curated photo spots."}, {"name": "Avenue of Stars", "lat": 22.2936, "lon": 114.1739, "desc": "Best for sunset to night skyline shots; Symphony of Lights view."}];
+
+// 初始化地图
+const map = L.map('map').setView([22.3193, 114.1694], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+// 标记与侧栏
+const sidebar = document.getElementById('sidebar');
+const latlngs = [];
+
+locations.forEach((loc, idx) => {
+  // 记录坐标
+  latlngs.push([loc.lat, loc.lon]);
+
+  // 添加标记
+  const marker = L.marker([loc.lat, loc.lon]).addTo(map).bindPopup(`<b>${idx+1}. ${loc.name}</b><br>${loc.desc}`);
+  loc._marker = marker;
+
+  // 渲染卡片
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<h3><span class="badge">${idx+1}</span>${loc.name}</h3><p>${loc.desc}</p>`;
+  card.onclick = () => {
+    map.setView([loc.lat, loc.lon], 16);
+    marker.openPopup();
+  };
+  sidebar.appendChild(card);
+});
+
+// 画路线并自适应视野
+if (latlngs.length > 1) {
+  const poly = L.polyline(latlngs, {color: 'blue', weight: 3}).addTo(map);
+  map.fitBounds(poly.getBounds(), {padding: [20, 20]});
+}
+
+// Tabs behavior
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+  });
+});
+
+// Place detail behavior: each card click fills right panel with actions
+const detailRoot = document.getElementById('place-detail');
+const cardsContainer = document.getElementById('sidebar');
+if (cardsContainer) {
+  cardsContainer.querySelectorAll('.card').forEach((card, idx) => {
+    card.addEventListener('click', () => {
+      const loc = locations[idx];
+      const wrap = document.createElement('div');
+      wrap.className = 'card';
+      wrap.innerHTML = `
+        <h3>${idx+1}. ${loc.name}</h3>
+        <p class="small">${loc.desc}</p>
+        <div class="btn-row">
+          <button class="btn" id="btn-zoom-${idx}">Focus on Map</button>
+          <a class="btn" href="https://maps.google.com/?q=${loc.lat},${loc.lon}" target="_blank" rel="noopener">Open in Google Maps</a>
+        </div>
+      `;
+      detailRoot.innerHTML = '';
+      detailRoot.appendChild(wrap);
+      // focus action
+      document.getElementById('btn-zoom-' + idx).addEventListener('click', () => {
+        map.setView([loc.lat, loc.lon], 16);
+        if (loc._marker) loc._marker.openPopup();
+      });
+    }, { once: false });
+  });
+}
+
+// Shadow on tabs when scrolled
+(function() {
+  const sidebar = document.querySelector('.sidebar');
+  const tabs = document.querySelector('.tabs');
+  if (sidebar && tabs) {
+    const onScroll = () => {
+      if (sidebar.scrollTop > 4) tabs.classList.add('scrolled');
+      else tabs.classList.remove('scrolled');
+    };
+    sidebar.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+})();
+</script>
+</body>
+</html>
